@@ -1,9 +1,9 @@
 name: 'Terraform'
 
 on:
-  # push:
-  #   branches: [ main ]
-  #   paths: [deployVM.tf, .github/workflows/main.yml] 
+  push:
+    branches: [ main ]
+    paths: [deployVM.tf, .github/workflows/main.yml] 
   workflow_dispatch:
     
 jobs:
