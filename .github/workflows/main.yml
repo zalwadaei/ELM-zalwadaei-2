@@ -1,14 +1,17 @@
 name: 'Terraform'
 
 on:
-  push:
-    branches: [ main ]
-    paths: [deployVM.tf, .github/workflows/main.yml] 
+  # push:
+  #   branches: [ main ]
+  #   paths: [deployVM.tf, .github/workflows/main.yml] 
   workflow_dispatch:
     
 jobs:
   terraform:
     runs-on: ubuntu-latest
+
+    env:
+      TF_VAR_ACCESS_KEY: ${{secrets.ACCESS_KEY}}
 
     steps:
       - name: Checkout
