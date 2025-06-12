@@ -1,3 +1,6 @@
+variable "ACCESS_KEY" {
+}
+
 terraform {
   required_version = ">=1.0"
 
