@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
     paths: [deployVM.tf, .github/workflows/main.yml] 
-  workflow_run:
+  workflow_dispatch:
     
 
 jobs:
