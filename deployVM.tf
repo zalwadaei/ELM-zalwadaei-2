@@ -1,149 +1,150 @@
 terraform {
-  backend "azurerm" {
-    resource_group_name   = "DevOpsConfig"
-    storage_account_name  = "saTerraform"
-    container_name        = "terraform"
-    key                   = "terraform.tfstate"
+  required_version = ">=1.0"
+
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "4.1.0"
+    }
   }
+
+  backend "azurerm" {
+        storage_account_name = "saterraformlabphi"
+        container_name = "terraform"
+        key = "terraform.tfstate"
+        access_key = "jqC2DtY1aPx4y17KJHk/iFsrgA3t5O6bWowKc1zQ/2TP+UNJuMjmMfbUkIpMR289w6o1PE/cfPwS+AStZKxNnA=="
+    }
 }
 
 provider "azurerm" {
-    features { }
+  subscription_id = "cd8acfc4-baea-4c96-8ae2-f6b5fc55eda8"
+  features {
+  }
 }
 
-variable "RG" {
-    default = "RG4"
+variable "RGName" {
+  default = "rgVirtualMachineDemo"
 }
 
-variable "VM" {
-    default = "VM1"
+variable "VMName" {
+  default = "VM1"
 }
 
-variable "VNET_ADDRESS" {
-    default = "10.10.0.0/16"
-}
-
-variable "SUBNET_ADDRESS" {
-    default = "10.10.0.0/24"
-}
-
-data "azurerm_key_vault" "keyvault" {
-    name = "kvHRSConfig"
-    resource_group_name = "DevOpsConfig" 
-}
-
-data "azurerm_key_vault_secret" "adminpwd" {
-    name = "adminpwd"
-    key_vault_id = data.azurerm_key_vault.keyvault.id
+variable "VMLocation" {
+  default = "SwedenCentral"
 }
 
 resource "azurerm_resource_group" "RG" {
-  name = var.RG
-  location = "West Europe"
+  name = var.RGName
+  location = var.VMLocation
+}
+
+variable "vnetaddress" {
+  default = "10.10.0.0/16"
+}
+
+variable "subnetaddress"{
+  default = "10.10.0.0/24"
 }
 
 resource "azurerm_virtual_network" "VNet" {
-  name = "VNet1"
-  address_space = [ var.VNET_ADDRESS ]
-  location = azurerm_resource_group.RG.location
-  resource_group_name = azurerm_resource_group.RG.name
+    name = "VNet1"
+    address_space = [var.vnetaddress]
+    location = azurerm_resource_group.RG.location
+    resource_group_name = azurerm_resource_group.RG.name
 }
 
 resource "azurerm_subnet" "Subnet1" {
-  name = "FESubnet"
-  address_prefixes = [ var.SUBNET_ADDRESS ]
-  resource_group_name = azurerm_resource_group.RG.name
-  virtual_network_name = azurerm_virtual_network.VNet.name
+    name = "FESubnet"
+    address_prefixes = [var.subnetaddress]
+    resource_group_name = azurerm_resource_group.RG.name
+    virtual_network_name = azurerm_virtual_network.VNet.name
 }
 
-resource "azurerm_public_ip" "Pip1" {
-    name = "PipVM1"
-    resource_group_name = azurerm_resource_group.RG.name
+resource "azurerm_public_ip" "PublicIP" {
+    name = "PublicIP1"
     location = azurerm_resource_group.RG.location
+    resource_group_name = azurerm_resource_group.RG.name
     allocation_method = "Static"
-    sku = "Standard"  
 }
 
-resource "azurerm_network_security_group" "NSG1" {
-    name = "NsgVM1"
-    resource_group_name = azurerm_resource_group.RG.name
-    location = azurerm_resource_group.RG.location
-}
-
-resource "azurerm_network_security_rule" "RDP" {
-  name = "AllowRDP"
-  priority = 100
-  direction = "Inbound"
-  access = "Allow"
-  protocol = "Tcp"
-  source_port_range = "*"
-  destination_port_range = "3389"
-  source_address_prefix = "*"
-  destination_address_prefix = "*"
-  network_security_group_name = azurerm_network_security_group.NSG1.name
+resource "azurerm_network_security_group" "my_terraform_nsg" {
+  name                = "VM_NSG"
+  location            = azurerm_resource_group.RG.location
   resource_group_name = azurerm_resource_group.RG.name
+
+  security_rule {
+    name                       = "RDP"
+    priority                   = 1000
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "3389"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+  security_rule {
+    name                       = "web"
+    priority                   = 1001
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "80"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
 }
 
-resource "azurerm_network_security_rule" "HTTP" {
-  name = "AllowHTTP"
-  priority = 101
-  direction = "Inbound"
-  access = "Allow"
-  protocol = "Tcp"
-  source_port_range = "*"
-  destination_port_range = "80"
-  source_address_prefix = "*"
-  destination_address_prefix = "*"
-  network_security_group_name = azurerm_network_security_group.NSG1.name
+resource "azurerm_network_interface" "VM_NIC" {
+  name                = "VM_NIC"
+  location            = azurerm_resource_group.RG.location
   resource_group_name = azurerm_resource_group.RG.name
+
+  ip_configuration {
+    name                          = "IPConfig1"
+    subnet_id                     = azurerm_subnet.Subnet1.id
+    private_ip_address_allocation = "Dynamic"
+    public_ip_address_id          = azurerm_public_ip.PublicIP.id
+  }  
 }
 
-resource "azurerm_network_interface" "NIC1" {
-    name = "NicVM1"
+resource "azurerm_network_interface_security_group_association" "SGNIC" {
+  network_interface_id      = azurerm_network_interface.VM_NIC.id
+  network_security_group_id = azurerm_network_security_group.my_terraform_nsg.id
+}
+
+resource "azurerm_storage_account" "sadiagnostics20250612" {
+    name = "sadiagnostics20250612"
+    location = azurerm_resource_group.RG.location   
+    resource_group_name = azurerm_resource_group.RG.name
+    account_tier = "Standard"
+    account_replication_type = "LRS"
+}
+
+resource "azurerm_windows_virtual_machine" "VM" {
+    name = var.VMName
     resource_group_name = azurerm_resource_group.RG.name
     location = azurerm_resource_group.RG.location
-    ip_configuration {
-        name = "ipconfigVM1"
-        subnet_id = azurerm_subnet.Subnet1.id
-        private_ip_address_allocation = "dynamic"
-        public_ip_address_id = azurerm_public_ip.Pip1.id  
+    size = "Standard_DS1_v2"
+    admin_username = "peter"
+    admin_password = "U2U_secret"
+    network_interface_ids = [azurerm_network_interface.VM_NIC.id]
+    os_disk {
+        name                 = "myOsDisk"
+        caching              = "ReadWrite"
+        storage_account_type = "Premium_LRS"
+    }
+
+    source_image_reference {
+        publisher = "MicrosoftWindowsServer"
+        offer     = "WindowsServer"
+        sku       = "2022-datacenter-azure-edition"
+        version   = "latest"
+    }
+
+    boot_diagnostics {
+        storage_account_uri = azurerm_storage_account.sadiagnostics20250612.primary_blob_endpoint
     }
 }
-
-resource "azurerm_network_interface_security_group_association" "NsgToNic" {
-    network_interface_id = azurerm_network_interface.NIC1.id 
-    network_security_group_id = azurerm_network_security_group.NSG1.id 
-}
-
-resource "azurerm_virtual_machine" "VM1" {
-    name = var.VM
-    resource_group_name = azurerm_resource_group.RG.name
-    location = azurerm_resource_group.RG.location
-    network_interface_ids = [ azurerm_network_interface.NIC1.id ]
-    vm_size = "Standard_D2S_v3"
-    delete_os_disk_on_termination = true
-
-    storage_image_reference {
-      publisher = "MicrosoftWindowsServer"
-      offer = "WindowsServer"
-      sku = "2019-Datacenter"
-      version = "latest"
-    }
-    storage_os_disk {
-      name = "osdiskVM1"
-      caching = "ReadWrite"
-      create_option = "FromImage"
-      managed_disk_type = "Premium_LRS"
-    }
-
-    os_profile {
-      computer_name = "VM1"
-      admin_username = "u2uadmin"
-      admin_password = data.azurerm_key_vault_secret.adminpwd.value
-    }
-
-    os_profile_windows_config {
-      provision_vm_agent = true
-    }
-}
-
